@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive Language Translator</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            text-align: center;
+        }
+        select, button {
+            font-size: 16px;
+            margin: 10px;
+            padding: 5px 10px;
+        }
+        #status, #transcription, #translation {
+            margin: 20px 0;
+        }
+        #recordButton {
+            background-color: #4CAF50;
+            border: none;
+            color: white;
+            padding: 15px 32px;
+            text-align: center;
+            text-decoration: none;
+            display: inline-block;
+            font-size: 16px;
+            margin: 4px 2px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <h1>Interactive Language Translator</h1>
+    <div>
+        <select id="sourceLanguage"></select>
+        <select id="targetLanguage"></select>
+    </div>
+    <button id="recordButton">Start Recording</button>
+    <p id="status">Ready</p>
+    <p id="transcription"></p>
+    <p id="translation"></p>
+
+    <script>
+        const languages = {
+            'en': 'English',
+            'es': 'Spanish',
+            'fr': 'French',
+            'de': 'German',
+            'it': 'Italian',
+            'ja': 'Japanese',
+            'ko': 'Korean',
+            'zh-CN': 'Chinese (Simplified)'
+        };
+
+        let recognition;
+        let isRecording = false;
+
+        function populateLanguageDropdowns() {
+            const sourceDropdown = document.getElementById('sourceLanguage');
+            const targetDropdown = document.getElementById('targetLanguage');
+
+            for (const [code, name] of Object.entries(languages)) {
+                sourceDropdown.options.add(new Option(name, code));
+                targetDropdown.options.add(new Option(name, code));
+            }
+
+            sourceDropdown.value = 'en';
+            targetDropdown.value = 'es';
+        }
+
+        function toggleRecording() {
+            if (isRecording) {
+                stopRecording();
+            } else {
+                startRecording();
+            }
+        }
+
+        function startRecording() {
+            recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
+            recognition.lang = document.getElementById('sourceLanguage').value;
+            recognition.continuous = true;
+            recognition.interimResults = true;
+
+            recognition.onresult = (event) => {
+                const result = event.results[event.results.length - 1];
+                const transcript = result[0].transcript;
+                document.getElementById('transcription').textContent = `Transcription: ${transcript}`;
+
+                if (result.isFinal) {
+                    translateText(transcript);
+                }
+            };
+
+            recognition.start();
+            isRecording = true;
+            document.getElementById('status').textContent = 'Recording...';
+            document.getElementById('recordButton').textContent = 'Stop Recording';
+        }
+
+        function stopRecording() {
+            if (recognition) {
+                recognition.stop();
+                isRecording = false;
+                document.getElementById('status').textContent = 'Ready';
+                document.getElementById('recordButton').textContent = 'Start Recording';
+            }
+        }
+
+        function translateText(text) {
+            const sourceLang = document.getElementById('sourceLanguage').value;
+            const targetLang = document.getElementById('targetLanguage').value;
+            
+            const apiUrl = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=${sourceLang}&tl=${targetLang}&dt=t&q=${encodeURI(text)}`;
+
+            fetch(apiUrl)
+                .then(response => response.json())
+                .then(data => {
+                    const translatedText = data[0][0][0];
+                    document.getElementById('translation').textContent = `Translation: ${translatedText}`;
+                    speakTranslation(translatedText, targetLang);
+                })
+                .catch(error => {
+                    console.error('Translation error:', error);
+                    document.getElementById('translation').textContent = 'Translation error. Please try again.';
+                });
+        }
+
+        function speakTranslation(text, lang) {
+            const speech = new SpeechSynthesisUtterance(text);
+            speech.lang = lang;
+            window.speechSynthesis.speak(speech);
+        }
+
+        document.getElementById('recordButton').addEventListener('click', toggleRecording);
+        populateLanguageDropdowns();
+    </script>
+</body>
+</html>
